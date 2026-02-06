@@ -6,7 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jbnu.jbnupms.common.exception.ErrorCode;
 import jbnu.jbnupms.common.exception.ErrorResponse;
-import jbnu.jbnupms.common.exception.GlobalException;
+import jbnu.jbnupms.common.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.AuthenticationException;
@@ -21,30 +21,25 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
-    private final ObjectMapper objectMapper;
+        private final ObjectMapper objectMapper;
 
-    @Override
-    public void commence(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            AuthenticationException authException
-    ) throws IOException, ServletException {
+        @Override
+        public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) throws IOException, ServletException {
 
-        GlobalException exception = (GlobalException) request.getAttribute("exception");
-        ErrorCode errorCode = exception != null ?
-                ErrorCode.valueOf(exception.getCode()) : ErrorCode.UNAUTHORIZED;
+                CustomException exception = (CustomException) request.getAttribute("exception");
+                ErrorCode errorCode = exception != null ? exception.getErrorCode() : ErrorCode.UNAUTHORIZED;
 
-        log.error("Unauthorized error: {}", errorCode.getMessage());
+                log.error("Unauthorized error: {}", errorCode.getMessage());
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(errorCode.getStatus().value())
-                .code(errorCode.getCode())
-                .message(errorCode.getMessage())
-                .build();
+                ErrorResponse errorResponse = ErrorResponse.builder()
+                                .timestamp(LocalDateTime.now())
+                                .status(errorCode.getHttpStatus().value())
+                                .code(errorCode.name())
+                                .message(errorCode.getMessage())
+                                .build();
 
-        response.setStatus(errorCode.getStatus().value());
-        response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
-    }
+                response.setStatus(errorCode.getHttpStatus().value());
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
+        }
 }

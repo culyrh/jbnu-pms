@@ -7,7 +7,7 @@ import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.security.Keys;
 import jbnu.jbnupms.common.exception.ErrorCode;
-import jbnu.jbnupms.common.exception.GlobalException;
+import jbnu.jbnupms.common.exception.CustomException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -27,8 +27,7 @@ public class JwtTokenProvider {
     public JwtTokenProvider(
             @Value("${jwt.secret}") String secretKey,
             @Value("${jwt.access-token-expiration}") long accessTokenExpiration,
-            @Value("${jwt.refresh-token-expiration}") long refreshTokenExpiration
-    ) {
+            @Value("${jwt.refresh-token-expiration}") long refreshTokenExpiration) {
         this.key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
         this.accessTokenExpiration = accessTokenExpiration;
         this.refreshTokenExpiration = refreshTokenExpiration;
@@ -44,7 +43,7 @@ public class JwtTokenProvider {
                 .claim("type", "access")
                 .issuedAt(now)
                 .expiration(expiration)
-                .signWith(key)  // SignatureAlgorithm 제거
+                .signWith(key) // SignatureAlgorithm 제거
                 .compact();
     }
 
@@ -72,10 +71,10 @@ public class JwtTokenProvider {
             return true;
         } catch (ExpiredJwtException e) {
             log.error("Expired JWT token: {}", e.getMessage());
-            throw new GlobalException(ErrorCode.EXPIRED_TOKEN);
+            throw new CustomException(ErrorCode.EXPIRED_TOKEN);
         } catch (UnsupportedJwtException | MalformedJwtException | IllegalArgumentException e) {
             log.error("Invalid JWT token: {}", e.getMessage());
-            throw new GlobalException(ErrorCode.INVALID_TOKEN);
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
         }
     }
 

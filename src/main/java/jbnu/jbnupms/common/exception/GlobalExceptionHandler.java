@@ -1,68 +1,146 @@
 package jbnu.jbnupms.common.exception;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jbnu.jbnupms.common.response.CommonResponse;
+import jbnu.jbnupms.common.response.ErrorResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.FieldError;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-
-@Slf4j
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(GlobalException.class)
-    public ResponseEntity<ErrorResponse> handleGlobalException(GlobalException e) {
-        log.error("GlobalException: {} - {}", e.getCode(), e.getMessage());
+    // 일반 에러
+    @ExceptionHandler(CustomException.class)
+    public ResponseEntity<CommonResponse<ErrorResponse>> handleCustomException(CustomException e,
+            HttpServletRequest request) {
+        ErrorCode errorCode = e.getErrorCode();
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(e.getStatus().value())
-                .code(e.getCode())
-                .message(e.getMessage())
-                .build();
+        log.warn("[CustomException] url: {} | errorType: {} | message: {}", request.getRequestURI(),
+                errorCode.name(), e.getMessage());
 
-        return ResponseEntity.status(e.getStatus()).body(errorResponse);
+        ErrorResponse errorResponse = ErrorResponse.of(
+                errorCode,
+                e.getMessage(),
+                request.getRequestURI());
+
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(CommonResponse.fail(errorResponse));
     }
 
+    // 검증 에러
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException e) {
-        log.error("Validation error: {}", e.getMessage());
+    public ResponseEntity<CommonResponse<ErrorResponse>> handleValidationException(
+            MethodArgumentNotValidException e,
+            HttpServletRequest request) {
 
-        Map<String, String> errors = new HashMap<>();
-        e.getBindingResult().getAllErrors().forEach(error -> {
-            String fieldName = ((FieldError) error).getField();
-            String errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
-        });
+        ErrorCode errorCode = ErrorCode.VALIDATION_FAILED;
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.BAD_REQUEST.value())
-                .code("VALIDATION_ERROR")
-                .message("입력값 검증에 실패했습니다.")
-                .errors(errors)
-                .build();
+        log.info("[ValidationException] url: {} | message: {}", request.getRequestURI(), e.getMessage());
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        ErrorResponse errorResponse = ErrorResponse.of(
+                errorCode,
+                e.getBindingResult(), // 실패한 필드 정보들
+                request.getRequestURI());
+
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(CommonResponse.fail(errorResponse));
     }
 
+    // 인증 실패 에러
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<CommonResponse<ErrorResponse>> handleAuthenticationException(
+            AuthenticationException e,
+            HttpServletRequest request) {
+
+        ErrorCode errorCode = ErrorCode.UNAUTHORIZED;
+
+        log.info("[AuthenticationException] url: {} | message: {}", request.getRequestURI(), e.getMessage());
+
+        ErrorResponse errorResponse = ErrorResponse.of(
+                errorCode,
+                e.getMessage(),
+                request.getRequestURI());
+
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(CommonResponse.fail(errorResponse));
+    }
+
+    // 권한 없음 에러
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<CommonResponse<ErrorResponse>> handleAccessDeniedException(
+            AccessDeniedException e,
+            HttpServletRequest request) {
+
+        ErrorCode errorCode = ErrorCode.FORBIDDEN;
+
+        log.info("[AccessDeniedException] url: {} | message: {}", request.getRequestURI(), e.getMessage());
+
+        ErrorResponse errorResponse = ErrorResponse.of(
+                errorCode,
+                e.getMessage(),
+                request.getRequestURI());
+
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(CommonResponse.fail(errorResponse));
+    }
+
+    // 405 에러
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<CommonResponse<ErrorResponse>> handleMethodNotSupportedException(
+            org.springframework.web.HttpRequestMethodNotSupportedException e,
+            HttpServletRequest request) {
+
+        ErrorCode errorCode = ErrorCode.METHOD_NOT_ALLOWED;
+
+        log.info("[MethodNotAllowed] url: {} | message: {}", request.getRequestURI(), e.getMessage());
+
+        ErrorResponse errorResponse = ErrorResponse.of(errorCode, e.getMessage(), request.getRequestURI());
+
+        return ResponseEntity.status(errorCode.getHttpStatus()).body(CommonResponse.fail(errorResponse));
+    }
+
+    // 415 에러
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<CommonResponse<ErrorResponse>> handleMediaTypeNotSupportedException(
+            org.springframework.web.HttpMediaTypeNotSupportedException e,
+            HttpServletRequest request) {
+
+        ErrorCode errorCode = ErrorCode.UNSUPPORTED_MEDIA_TYPE;
+
+        log.info("[UnsupportedMediaType] url: {} | message: {}", request.getRequestURI(), e.getMessage());
+
+        ErrorResponse errorResponse = ErrorResponse.of(errorCode, e.getMessage(), request.getRequestURI());
+
+        return ResponseEntity.status(errorCode.getHttpStatus()).body(CommonResponse.fail(errorResponse));
+    }
+
+    // 나머지 모든 예외 처리
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleException(Exception e) {
-        log.error("Unexpected error: ", e);
+    public ResponseEntity<CommonResponse<ErrorResponse>> handleAllException(
+            Exception e,
+            HttpServletRequest request) {
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .code("INTERNAL_SERVER_ERROR")
-                .message("서버 내부 오류가 발생했습니다.")
-                .build();
+        ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
 
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        log.warn("[InternalServerError] url: {} | message: {}", request.getRequestURI(), e.getMessage(), e);
+
+        ErrorResponse errorResponse = ErrorResponse.of(
+                errorCode,
+                e.getMessage(),
+                request.getRequestURI());
+
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(CommonResponse.fail(errorResponse));
     }
 }
