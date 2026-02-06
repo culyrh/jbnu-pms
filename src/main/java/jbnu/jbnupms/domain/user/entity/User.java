@@ -71,6 +71,8 @@ public class User {
         this.profileImage = profileImage;
     }
 
+    public void updateEmail(String email) { this.email = email; }
+
     public void softDelete() {
         this.isDeleted = true;
     }
