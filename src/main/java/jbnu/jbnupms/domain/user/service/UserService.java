@@ -59,7 +59,7 @@ public class UserService {
         // 비밀번호 업데이트
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             // 소셜 로그인 사용자는 비밀번호 변경 불가
-            if (!user.getProvider().equals("EMAIL")) {
+            if (!user.getProvider().contains("EMAIL")) {
                 throw new CustomException(ErrorCode.SOCIAL_USER_PASSWORD_CHANGE);
             }
 
