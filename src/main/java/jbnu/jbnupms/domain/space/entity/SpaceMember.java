@@ -44,7 +44,8 @@ public class SpaceMember {
         this.joinedAt = LocalDateTime.now();
     }
 
-    public enum SpaceRole {
-        ADMIN, MEMBER
+    public void updateRole(SpaceRole role) {
+        this.role = role;
     }
+
 }

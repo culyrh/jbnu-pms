@@ -2,6 +2,7 @@ package jbnu.jbnupms.domain.space.dto;
 
 import jbnu.jbnupms.domain.space.entity.Space;
 import jbnu.jbnupms.domain.space.entity.SpaceMember;
+import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Getter
+@Builder
 public class SpaceDetailResponse {
     private Long id;
     private String name;
@@ -17,15 +19,17 @@ public class SpaceDetailResponse {
     private LocalDateTime createdAt;
     private List<MemberDto> members;
 
-    public SpaceDetailResponse(Space space, List<SpaceMember> members) {
-        this.id = space.getId();
-        this.name = space.getName();
-        this.description = space.getDescription();
-        this.ownerId = space.getOwner().getId();
-        this.createdAt = space.getCreatedAt();
-        this.members = members.stream()
-                .map(MemberDto::new)
-                .collect(Collectors.toList());
+    public static SpaceDetailResponse from(Space space, List<SpaceMember> members) {
+        return SpaceDetailResponse.builder()
+                .id(space.getId())
+                .name(space.getName())
+                .description(space.getDescription())
+                .ownerId(space.getOwner().getId())
+                .createdAt(space.getCreatedAt())
+                .members(members.stream()
+                        .map(MemberDto::new)
+                        .collect(Collectors.toList()))
+                .build();
     }
 
     @Getter

@@ -5,11 +5,12 @@ import jbnu.jbnupms.common.response.CommonResponse;
 import jbnu.jbnupms.common.response.ErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import javax.naming.AuthenticationException;
+import java.nio.file.AccessDeniedException;
 
 @RestControllerAdvice
 @Slf4j
@@ -80,7 +81,7 @@ public class GlobalExceptionHandler {
             AccessDeniedException e,
             HttpServletRequest request) {
 
-        ErrorCode errorCode = ErrorCode.FORBIDDEN;
+        ErrorCode errorCode = ErrorCode.ACCESS_DENIED;
 
         log.info("[AccessDeniedException] url: {} | message: {}", request.getRequestURI(), e.getMessage());
 

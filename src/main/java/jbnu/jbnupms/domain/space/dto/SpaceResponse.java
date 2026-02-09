@@ -1,11 +1,13 @@
 package jbnu.jbnupms.domain.space.dto;
 
 import jbnu.jbnupms.domain.space.entity.Space;
+import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
 
 @Getter
+@Builder
 public class SpaceResponse {
     private Long id;
     private String name;
@@ -13,11 +15,13 @@ public class SpaceResponse {
     private Long ownerId;
     private LocalDateTime createdAt;
 
-    public SpaceResponse(Space space) {
-        this.id = space.getId();
-        this.name = space.getName();
-        this.description = space.getDescription();
-        this.ownerId = space.getOwner().getId();
-        this.createdAt = space.getCreatedAt();
+    public static SpaceResponse from(Space space) {
+        return SpaceResponse.builder()
+                .id(space.getId())
+                .name(space.getName())
+                .description(space.getDescription())
+                .ownerId(space.getOwner().getId())
+                .createdAt(space.getCreatedAt())
+                .build();
     }
 }

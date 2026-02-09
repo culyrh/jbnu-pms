@@ -29,7 +29,6 @@ public enum ErrorCode {
     REFRESH_TOKEN_NOT_FOUND(HttpStatus.UNAUTHORIZED, "리프레시 토큰을 찾을 수 없습니다."), // Existing
 
     // 403 Forbidden
-    FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."), // Existing (Duplicate with FORBIDDEN)
     SOCIAL_USER_PASSWORD_CHANGE(HttpStatus.FORBIDDEN, "소셜 로그인 사용자는 비밀번호를 변경할 수 없습니다."),
 

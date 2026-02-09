@@ -1,12 +1,13 @@
 package jbnu.jbnupms.domain.space.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Getter
 @NoArgsConstructor
-public class CreateSpaceRequest {
+public class SpaceUpdateRequest {
+    @NotBlank(message = "스페이스 이름은 필수입니다.")
     private String name;
     private String description;
-    private Long ownerId; // 임시. 추후 로그인된 유저의 ID로 수정
 }
