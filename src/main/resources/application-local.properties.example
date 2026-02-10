@@ -39,3 +39,10 @@ spring.security.oauth2.client.provider.google.token-uri=https://oauth2.googleapi
 spring.security.oauth2.client.provider.google.user-info-uri=https://www.googleapis.com/oauth2/v3/userinfo
 spring.security.oauth2.client.provider.google.user-name-attribute=sub
 
+# OAuth2 Provider 설정 외부화 (API 로그인용)
+oauth2.providers.google.user-info-uri=https://www.googleapis.com/oauth2/v3/userinfo
+oauth2.providers.google.user-name-attribute=sub
+
+# RestTemplate 타임아웃 설정
+oauth2.rest-template.connect-timeout=5000
+oauth2.rest-template.read-timeout=10000

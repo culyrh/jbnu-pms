@@ -2,10 +2,7 @@ package jbnu.jbnupms.domain.user.controller;
 
 import jakarta.validation.Valid;
 import jbnu.jbnupms.common.response.CommonResponse;
-import jbnu.jbnupms.domain.user.dto.LoginRequest;
-import jbnu.jbnupms.domain.user.dto.RefreshTokenRequest;
-import jbnu.jbnupms.domain.user.dto.RegisterRequest;
-import jbnu.jbnupms.domain.user.dto.TokenResponse;
+import jbnu.jbnupms.domain.user.dto.*;
 import jbnu.jbnupms.domain.user.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,8 +24,13 @@ public class AuthController {
     @ResponseStatus(HttpStatus.CREATED)
     public ResponseEntity<CommonResponse<Long>> register(@Valid @RequestBody RegisterRequest request) {
         Long userId = authService.register(request);
-        return ResponseEntity.created(URI.create("/users/" + userId))
-                .body(CommonResponse.success(userId));
+        return ResponseEntity.created(URI.create("/users/" + userId)).body(CommonResponse.success(userId));
+    }
+
+    // 이메일 중복 확인
+    @GetMapping("/check-email")
+    public ResponseEntity<CommonResponse<EmailCheckResponse>> checkEmail(@RequestParam String email) {
+        return ResponseEntity.ok(CommonResponse.success(authService.checkEmailAvailability(email)));
     }
 
     @PostMapping("/login")
@@ -38,7 +40,7 @@ public class AuthController {
 
     @PostMapping("/refresh")
     public ResponseEntity<CommonResponse<TokenResponse>> refresh(@Valid @RequestBody RefreshTokenRequest request) {
-        return ResponseEntity.ok(CommonResponse.success(authService.refresh(request.getRefreshToken())));
+        return ResponseEntity.ok(CommonResponse.success(authService.refresh(request)));
     }
 
     @PostMapping("/logout")
@@ -46,5 +48,10 @@ public class AuthController {
         Long userId = Long.parseLong(userDetails.getUsername());
         authService.logout(userId);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/oauth2/login")
+    public ResponseEntity<CommonResponse<TokenResponse>> oauth2Login(@Valid @RequestBody OAuth2LoginRequest request) {
+        return ResponseEntity.ok(CommonResponse.success(authService.oauth2Login(request)));
     }
 }
