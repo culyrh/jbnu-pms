@@ -35,22 +35,22 @@ public class SpaceService {
         @Transactional
         public Long createSpace(Long userId, SpaceCreateRequest request) {
                 User owner = userRepository.findById(userId)
-                                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+                        .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
                 Space space = Space.builder()
-                                .name(request.getName())
-                                .description(request.getDescription())
-                                .owner(owner)
-                                .build();
+                        .name(request.getName())
+                        .description(request.getDescription())
+                        .owner(owner)
+                        .build();
 
                 Space savedSpace = spaceRepository.save(space);
 
                 // 생성자는 ADMIN으로 추가
                 SpaceMember spaceMember = SpaceMember.builder()
-                                .space(savedSpace)
-                                .user(owner)
-                                .role(SpaceRole.ADMIN)
-                                .build();
+                        .space(savedSpace)
+                        .user(owner)
+                        .role(SpaceRole.ADMIN)
+                        .build();
                 spaceMemberRepository.save(spaceMember);
 
                 return savedSpace.getId();
@@ -62,18 +62,18 @@ public class SpaceService {
                 List<SpaceMember> memberships = spaceMemberRepository.findByUserId(userId);
 
                 return memberships.stream()
-                                .map(SpaceMember::getSpace)
-                                .map(SpaceResponse::from)
-                                .collect(Collectors.toList());
+                        .map(SpaceMember::getSpace)
+                        .map(SpaceResponse::from)
+                        .collect(Collectors.toList());
         }
 
         // 스페이스 단건 조회
         public SpaceDetailResponse getSpace(Long userId, Long spaceId) {
                 Space space = spaceRepository.findById(spaceId)
-                                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+                        .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
                 User user = userRepository.findActiveById(userId)
-                                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+                        .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
                 // 멤버인지 확인
                 if (!spaceMemberRepository.existsBySpaceAndUser(space, user)) {
@@ -89,7 +89,7 @@ public class SpaceService {
         @Transactional
         public void updateSpace(Long userId, Long spaceId, SpaceUpdateRequest request) {
                 Space space = spaceRepository.findById(spaceId)
-                                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+                        .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
                 validateAdminPermission(userId, spaceId);
 
@@ -100,7 +100,7 @@ public class SpaceService {
         @Transactional
         public void deleteSpace(Long userId, Long spaceId) {
                 Space space = spaceRepository.findById(spaceId)
-                                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+                        .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
                 validateAdminPermission(userId, spaceId);
 
@@ -110,15 +110,15 @@ public class SpaceService {
         // 스페이스 멤버 초대
         @Transactional
         public void inviteMember(Long userId, Long spaceId, SpaceInviteRequest request) {
-                
+
                 // 리더인지 확인
                 validateAdminPermission(userId, spaceId);
 
                 User targetUser = userRepository.findByEmail(request.getEmail())
-                                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+                        .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
                 Space space = spaceRepository.findById(spaceId)
-                                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND, "해당 스페이스를 찾을 수 없습니다."));
+                        .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND, "해당 스페이스를 찾을 수 없습니다."));
 
                 // 이미 멤버인지 확인
                 if (spaceMemberRepository.existsBySpaceAndUser(space, targetUser)) {
@@ -126,10 +126,10 @@ public class SpaceService {
                 }
 
                 SpaceMember member = SpaceMember.builder()
-                                .space(space)
-                                .user(targetUser)
-                                .role(request.getRole() != null ? request.getRole() : SpaceRole.MEMBER)
-                                .build();
+                        .space(space)
+                        .user(targetUser)
+                        .role(request.getRole() != null ? request.getRole() : SpaceRole.MEMBER)
+                        .build();
 
                 spaceMemberRepository.save(member);
         }
@@ -141,13 +141,13 @@ public class SpaceService {
                 validateAdminPermission(userId, spaceId);
 
                 User targetUser = userRepository.findActiveById(targetUserId)
-                                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+                        .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
                 Space space = spaceRepository.findById(spaceId)
-                                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND, "해당 스페이스가 존재하지 않습니다."));
+                        .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND, "해당 스페이스가 존재하지 않습니다."));
 
                 SpaceMember member = spaceMemberRepository.findByUserIdAndSpaceId(userId, spaceId)
-                                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND, "해당 스페이스에 속하지 않은 멤버입니다."));
+                        .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND, "해당 스페이스에 속하지 않은 멤버입니다."));
 
                 member.updateRole(request.getRole());
         }

@@ -3,15 +3,13 @@ package jbnu.jbnupms.domain.user.service;
 import jbnu.jbnupms.common.audit.UserAuditLogger;
 import jbnu.jbnupms.common.exception.CustomException;
 import jbnu.jbnupms.common.exception.ErrorCode;
-import jbnu.jbnupms.domain.user.dto.RefreshTokenRequest;
+import jbnu.jbnupms.domain.user.dto.*;
 import jbnu.jbnupms.security.jwt.JwtTokenProvider;
-import jbnu.jbnupms.domain.user.dto.LoginRequest;
-import jbnu.jbnupms.domain.user.dto.RegisterRequest;
-import jbnu.jbnupms.domain.user.dto.TokenResponse;
 import jbnu.jbnupms.domain.user.entity.RefreshToken;
 import jbnu.jbnupms.domain.user.entity.User;
 import jbnu.jbnupms.domain.user.repository.RefreshTokenRepository;
 import jbnu.jbnupms.domain.user.repository.UserRepository;
+import jbnu.jbnupms.security.oauth.OAuth2UserInfoService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -31,6 +30,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserAuditLogger auditLogger;
+    private final OAuth2UserInfoService oauth2UserInfoService;
 
     @Transactional
     public Long register(RegisterRequest request) {
@@ -82,6 +82,53 @@ public class AuthService {
         return TokenResponse.of(accessToken, refreshToken);
     }
 
+    // todo (6) (예정) : Redis 블랙리스트로 access token 무효화 구현하여 로그아웃
+    //  -> [V] 액세스 토큰 만료시간 5분으로 수정
+    //  -> accesstoken이 만료되지 않은 상황에서 계속 재사용 될 수 있는 상황
+    @Transactional
+    public void logout(Long userId) {
+        log.info("User logged out: userId={}", userId);
+    }
+
+    // OAuth2 로그인
+    // 트랜잭션 범위 최적화 - HTTP 호출은 트랜잭션 밖에서 수행
+    public TokenResponse oauth2Login(OAuth2LoginRequest request) {
+        // 1. 트랜잭션 밖에서 OAuth provider로부터 사용자 정보 가져오기 (HTTP 호출)
+        Map<String, Object> userInfo = oauth2UserInfoService.getUserInfo(
+                request.getProvider(),
+                request.getAccessToken()
+        );
+
+        // 2. 사용자 정보 추출
+        String providerId = (String) userInfo.get("sub");
+        String email = (String) userInfo.get("email");
+        String name = (String) userInfo.get("name");
+        String profileImage = (String) userInfo.get("picture");
+
+        if (providerId == null || email == null) {
+            throw new CustomException(ErrorCode.INVALID_TOKEN,
+                    "OAuth 토큰으로부터 필수 정보를 가져올 수 없습니다.");
+        }
+
+        // 3. 트랜잭션 안에서 DB 작업만 수행
+        User user = saveOrUpdateOAuthUserInTransaction(
+                providerId,
+                email,
+                name,
+                profileImage,
+                request.getProvider().toUpperCase()
+        );
+
+        // 4. JWT 토큰 생성
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail());
+        String refreshToken = handleRefreshToken(user.getId());
+
+        // 민감 정보 로깅 제거
+        log.info("OAuth2 login successful: provider={}, userId={}", request.getProvider(), user.getId());
+
+        return TokenResponse.of(accessToken, refreshToken);
+    }
+
     // [V] refresh token 전달 방식 (string-> request 객체)
     @Transactional
     public TokenResponse refresh(RefreshTokenRequest request) {
@@ -101,12 +148,70 @@ public class AuthService {
         return TokenResponse.of(newAccessToken, refreshToken.getToken());
     }
 
-    // todo (6) (예정) : Redis 블랙리스트로 access token 무효화 구현하여 로그아웃
-    //  -> [V] 액세스 토큰 만료시간 5분으로 수정
-    //  -> accesstoken이 만료되지 않은 상황에서 계속 재사용 될 수 있는 상황
+    // 이메일 중복 확인
+    public EmailCheckResponse checkEmailAvailability(String email) {
+        boolean exists = userRepository.existsByEmail(email);
+
+        if (exists) {
+            log.info("Email already exists: {}", email);
+            return EmailCheckResponse.unavailable();
+        }
+
+        log.info("Email available: {}", email);
+        return EmailCheckResponse.available();
+    }
+
+    // OAuth 사용자 저장/업데이트는 별도 트랜잭션으로 분리
     @Transactional
-    public void logout(Long userId) {
-        log.info("User logged out: userId={}", userId);
+    protected User saveOrUpdateOAuthUserInTransaction(String providerId, String email, String name,
+                                                      String profileImage, String provider) {
+        return userRepository.findByProviderAndProviderId(provider, providerId)
+                .map(existingUser -> {
+                    existingUser.updateName(name);
+                    if (profileImage != null) {
+                        existingUser.updateProfileImage(profileImage);
+                    }
+                    log.info("OAuth2 user updated: email={}", email);
+                    return userRepository.save(existingUser);
+                })
+                .orElseGet(() -> {
+                    return userRepository.findByEmail(email)
+                            .map(existingUser -> {
+                                String currentProvider = existingUser.getProvider();
+                                if (!currentProvider.contains(provider)) {
+                                    existingUser.setProvider(currentProvider + "," + provider);
+                                }
+                                existingUser.setProviderId(providerId);
+                                if (profileImage != null) {
+                                    existingUser.updateProfileImage(profileImage);
+                                }
+                                User updated = userRepository.save(existingUser);
+                                log.info("Added {} to existing user: email={}", provider, email);
+                                return updated;
+                            })
+                            .orElseGet(() -> {
+                                User newUser = User.builder()
+                                        .email(email)
+                                        .name(name)
+                                        .profileImage(profileImage)
+                                        .provider(provider)
+                                        .providerId(providerId)
+                                        .password(null)
+                                        .build();
+
+                                User saved = userRepository.save(newUser);
+
+                                auditLogger.logRegister(
+                                        saved.getId(),
+                                        saved.getEmail(),
+                                        saved.getName(),
+                                        saved.getProvider()
+                                );
+
+                                log.info("New OAuth2 user created: email={}", email);
+                                return saved;
+                            });
+                });
     }
 
     /**
