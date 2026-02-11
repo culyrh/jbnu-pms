@@ -4,6 +4,7 @@ import jbnu.jbnupms.common.audit.UserAuditLogger;
 import jbnu.jbnupms.common.exception.CustomException;
 import jbnu.jbnupms.common.exception.ErrorCode;
 import jbnu.jbnupms.domain.user.dto.*;
+import jbnu.jbnupms.domain.user.entity.VerificationType;
 import jbnu.jbnupms.security.jwt.JwtTokenProvider;
 import jbnu.jbnupms.domain.user.entity.RefreshToken;
 import jbnu.jbnupms.domain.user.entity.User;
@@ -31,9 +32,17 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserAuditLogger auditLogger;
     private final OAuth2UserInfoService oauth2UserInfoService;
+    private final VerificationService verificationService;
 
     @Transactional
     public Long register(RegisterRequest request) {
+        // 인증 코드 검증
+        verificationService.validateVerification(
+                request.getEmail(),
+                request.getVerificationCode(),
+                VerificationType.REGISTER
+        );
+
         // 이메일 중복 확인
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
@@ -48,6 +57,9 @@ public class AuthService {
                 .build();
 
         User savedUser = userRepository.save(user);
+
+        // 인증 코드 삭제
+        verificationService.deleteVerificationCode(request.getEmail(), VerificationType.REGISTER);
 
         // 감사 로그 기록
         // todo (1): (예정) 레벨을 나눠서 원인 별로 로깅 기록 추가 (ip에서 로그인 시도/실패 기록) - 어노테이션 활용
@@ -82,15 +94,14 @@ public class AuthService {
         return TokenResponse.of(accessToken, refreshToken);
     }
 
+    // [V] 액세스 토큰 만료시간 5분으로 수정
     // todo (6) (예정) : Redis 블랙리스트로 access token 무효화 구현하여 로그아웃
-    //  -> [V] 액세스 토큰 만료시간 5분으로 수정
     //  -> accesstoken이 만료되지 않은 상황에서 계속 재사용 될 수 있는 상황
     @Transactional
     public void logout(Long userId) {
         log.info("User logged out: userId={}", userId);
     }
 
-    // OAuth2 로그인
     // 트랜잭션 범위 최적화 - HTTP 호출은 트랜잭션 밖에서 수행
     public TokenResponse oauth2Login(OAuth2LoginRequest request) {
         // 1. 트랜잭션 밖에서 OAuth provider로부터 사용자 정보 가져오기 (HTTP 호출)
@@ -148,7 +159,9 @@ public class AuthService {
         return TokenResponse.of(newAccessToken, refreshToken.getToken());
     }
 
-    // 이메일 중복 확인
+    /**
+     * 이메일 중복 확인
+     */
     public EmailCheckResponse checkEmailAvailability(String email) {
         boolean exists = userRepository.existsByEmail(email);
 
@@ -161,7 +174,44 @@ public class AuthService {
         return EmailCheckResponse.available();
     }
 
-    // OAuth 사용자 저장/업데이트는 별도 트랜잭션으로 분리
+    /**
+     * 비밀번호 재설정
+     */
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        // 1. 인증 코드 검증
+        verificationService.validateVerification(
+                request.getEmail(),
+                request.getCode(),
+                VerificationType.PASSWORD_RESET
+        );
+
+        // 2. 사용자 조회
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // 3. 소셜 로그인 사용자는 비밀번호 변경 불가
+        if (!user.getProvider().contains("EMAIL")) {
+            throw new CustomException(ErrorCode.SOCIAL_USER_PASSWORD_CHANGE);
+        }
+
+        // 4. 비밀번호 변경
+        String encodedPassword = passwordEncoder.encode(request.getNewPassword());
+        user.updatePassword(encodedPassword);
+        userRepository.save(user);
+
+        // 5. 인증 코드 삭제
+        verificationService.deleteVerificationCode(request.getEmail(), VerificationType.PASSWORD_RESET);
+
+        // 6. 감사 로그 기록
+        auditLogger.logChangePassword(user.getId());
+
+        log.info("Password reset successfully: email={}", request.getEmail());
+    }
+
+    /**
+     * OAuth 사용자 저장/업데이트는 별도 트랜잭션으로 분리
+     */
     @Transactional
     protected User saveOrUpdateOAuthUserInTransaction(String providerId, String email, String name,
                                                       String profileImage, String provider) {
@@ -216,8 +266,8 @@ public class AuthService {
 
     /**
      * Refresh Token 처리 (고정 만료 방식 - 7일)
-     * 1. 기존 토큰 유효하면 재사용
-     * 2. 없거나 만료되었으면 새로 생성
+     * - 기존 토큰 유효하면 재사용
+     * - 없거나 만료되었으면 새로 생성
      */
     // [V] 토큰이 만료된 경우와 토큰이 처음 생성되는 경우 모두를 포함하여 UPSERT 쿼리 하나로 처리
     // -> UPSERT 적용을 위해 refresh token의 user_id 필드에 unique 조건이 추가됨

@@ -46,3 +46,18 @@ oauth2.providers.google.user-name-attribute=sub
 # RestTemplate 타임아웃 설정
 oauth2.rest-template.connect-timeout=5000
 oauth2.rest-template.read-timeout=10000
+
+# SMTP 설정
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=${MAIL_USERNAME:your-email@gmail.com}
+spring.mail.password=${MAIL_PASSWORD:your-app-password}
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+spring.mail.properties.mail.smtp.starttls.required=true
+spring.mail.properties.mail.smtp.timeout=5000
+
+# Redis 설정 (인증 코드 저장용)
+spring.data.redis.host=localhost
+spring.data.redis.port=6379
+spring.data.redis.password=
