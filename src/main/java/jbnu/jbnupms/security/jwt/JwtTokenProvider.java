@@ -66,13 +66,31 @@ public class JwtTokenProvider {
         return Long.parseLong(claims.getSubject());
     }
 
+    /**
+     * 토큰 검증 없이 userId 추출 (만료된 토큰도 파싱 가능)
+     */
+    public Long getUserIdFromTokenWithoutValidation(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(key)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return Long.parseLong(claims.getSubject());
+        } catch (ExpiredJwtException e) {
+            // 만료된 토큰이어도 claims는 추출 가능
+            return Long.parseLong(e.getClaims().getSubject());
+        }
+    }
+
     public boolean validateToken(String token) {
         try {
             parseClaims(token);
             return true;
         } catch (ExpiredJwtException e) {
+            // 액세스 토큰 만료 예외
             log.error("Expired JWT token: {}", e.getMessage());
-            throw new CustomException(ErrorCode.EXPIRED_TOKEN);
+            throw new CustomException(ErrorCode.EXPIRED_ACCESS_TOKEN);
         } catch (UnsupportedJwtException | MalformedJwtException | IllegalArgumentException e) {
             log.error("Invalid JWT token: {}", e.getMessage());
             throw new CustomException(ErrorCode.INVALID_TOKEN);

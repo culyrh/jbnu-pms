@@ -18,7 +18,8 @@ public class RefreshToken {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    // 리프레시 토큰의 UPSERT를 위해 unique 제약 추가
+    @Column(nullable = false, unique = true)
     private Long userId;
 
     @Column(nullable = false, unique = true, length = 500)

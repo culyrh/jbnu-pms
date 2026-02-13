@@ -1,5 +1,6 @@
 package jbnu.jbnupms.domain.user.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import jbnu.jbnupms.common.response.CommonResponse;
 import jbnu.jbnupms.domain.user.dto.DeleteUserRequest;
@@ -19,17 +20,20 @@ public class UserController {
 
     private final UserService userService;
 
+    @Operation(summary = "내 정보 조회")
     @GetMapping("/me")
     public ResponseEntity<CommonResponse<UserResponse>> getMyInfo(@AuthenticationPrincipal UserDetails userDetails) {
         Long userId = Long.parseLong(userDetails.getUsername());
         return ResponseEntity.ok(CommonResponse.success(userService.getMyInfo(userId)));
     }
 
+    @Operation(summary = "사용자 정보 조회")
     @GetMapping("/{userId}")
     public ResponseEntity<CommonResponse<UserResponse>> getUserById(@PathVariable Long userId) {
         return ResponseEntity.ok(CommonResponse.success(userService.getUserById(userId)));
     }
 
+    @Operation(summary = "사용자 정보 수정")
     @PatchMapping("/{userId}")
     public ResponseEntity<CommonResponse<UserResponse>> updateUser(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -40,6 +44,7 @@ public class UserController {
         return ResponseEntity.ok(CommonResponse.success(userService.updateUser(requestUserId, userId, request)));
     }
 
+    @Operation(summary = "회원 탈퇴")
     @DeleteMapping("/{userId}")
     public ResponseEntity<CommonResponse<Void>> deleteUser(
             @AuthenticationPrincipal UserDetails userDetails,
