@@ -1,0 +1,55 @@
+package jbnu.jbnupms.domain.file.controller;
+
+import io.swagger.v3.oas.annotations.Operation;
+import jbnu.jbnupms.common.response.CommonResponse;
+import jbnu.jbnupms.domain.file.dto.FileResponse;
+import jbnu.jbnupms.domain.file.service.TaskFileService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/tasks/{taskId}/files")
+@RequiredArgsConstructor
+public class TaskFileController {
+
+    private final TaskFileService taskFileService;
+
+    @Operation(summary = "태스크 파일 업로드")
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<CommonResponse<FileResponse>> uploadTaskFile(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long taskId,
+            @RequestParam("file") MultipartFile file) {
+        Long userId = Long.parseLong(userDetails.getUsername());
+        FileResponse response = taskFileService.uploadTaskFile(taskId, file, userId);
+        return ResponseEntity.ok(CommonResponse.success(response));
+    }
+
+    @Operation(summary = "태스크 파일 목록 조회")
+    @GetMapping
+    public ResponseEntity<CommonResponse<List<FileResponse>>> getTaskFiles(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long taskId) {
+        Long userId = Long.parseLong(userDetails.getUsername());
+        List<FileResponse> responses = taskFileService.getTaskFiles(taskId, userId);
+        return ResponseEntity.ok(CommonResponse.success(responses));
+    }
+
+    @Operation(summary = "태스크 파일 삭제")
+    @DeleteMapping("/{fileId}")
+    public ResponseEntity<CommonResponse<Void>> deleteTaskFile(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long taskId,
+            @PathVariable Long fileId) {
+        Long userId = Long.parseLong(userDetails.getUsername());
+        taskFileService.deleteTaskFile(taskId, fileId, userId);
+        return ResponseEntity.ok(CommonResponse.success(null));
+    }
+}
