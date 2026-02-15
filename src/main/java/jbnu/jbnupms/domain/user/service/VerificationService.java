@@ -68,7 +68,7 @@ public class VerificationService {
     }
 
     /**
-     * 인증 코드 확인 (선택적 - 프론트에서 즉시 피드백용)
+     * 인증 코드 확인
      */
     @Transactional
     public void verifyCode(String email, String code, VerificationType type) {
