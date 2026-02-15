@@ -22,11 +22,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u WHERE u.provider = :provider AND u.providerId = :providerId AND u.isDeleted = false")
     Optional<User> findByProviderAndProviderId(String provider, String providerId);
 
-    // ID로 사용자 조회 (삭제되지 않은 사용자만)
+    // ID로 사용자 조회 - 삭제되지 않은 사용자만
     @Query("SELECT u FROM User u WHERE u.id = :id AND u.isDeleted = false")
-    Optional<User> findActiveById(Long id);
+    Optional<User> findById(Long id);
 
-    // 모든 사용자 조회 (삭제된 사용자 포함)
+    // 모든 사용자 조회 - 삭제된 사용자 포함
     @Query("SELECT u FROM User u WHERE u.id = :id")
     Optional<User> findByIdIncludingDeleted(Long id);
 }
