@@ -1,8 +1,9 @@
 package jbnu.jbnupms.domain.user.dto;
 
-import jakarta.validation.constraints.Email;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jbnu.jbnupms.domain.user.entity.VerificationType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -13,10 +14,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SendVerificationRequest {
 
+    @Schema(example = "user@jbnu.ac.kr")
     @NotBlank(message = "이메일은 필수입니다.")
-    @Email(message = "올바른 이메일 형식이 아닙니다.")
+    @Pattern(
+            regexp = "^(?=.{1,64}@)[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*@[^-][A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*(\\.[A-Za-z]{2,})$",
+            message = "올바른 이메일 형식이 아닙니다."
+    )
     private String email;
 
+    @Schema(example = "REGISTER")
     @NotNull(message = "인증 타입은 필수입니다.")
     private VerificationType type; // REGISTER, PASSWORD_RESET
 }
