@@ -58,6 +58,7 @@ public enum ErrorCode {
     TASK_ACCESS_DENIED(HttpStatus.FORBIDDEN, "작업에 대한 접근 권한이 없습니다."),
     COMMENT_UNAUTHORIZED(HttpStatus.FORBIDDEN, "댓글에 대한 권한이 없습니다."),
     FILE_DELETE_UNAUTHORIZED(HttpStatus.FORBIDDEN, "파일을 삭제할 권한이 없습니다."),
+    VIEWER_WRITE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "읽기 전용(VIEWER) 권한으로는 해당 작업을 수행할 수 없습니다."), // 추가
 
     // 404 Not Found
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
