@@ -63,6 +63,16 @@ public class UserService {
                 throw new CustomException(ErrorCode.SOCIAL_USER_PASSWORD_CHANGE);
             }
 
+            // 현재 비밀번호 입력 여부 확인
+            if (request.getCurrentPassword() == null || request.getCurrentPassword().isBlank()) {
+                throw new CustomException(ErrorCode.INVALID_INPUT_VALUE, "현재 비밀번호를 입력해주세요.");
+            }
+
+            // 현재 비밀번호 일치 여부 확인
+            if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+                throw new CustomException(ErrorCode.INVALID_PASSWORD);
+            }
+
             String encodedPassword = passwordEncoder.encode(request.getPassword());
             user.updatePassword(encodedPassword);
 
@@ -127,12 +137,12 @@ public class UserService {
     }
 
     /** 회원 탈퇴 시 사용자 정보를 ghost 유저로 변환
-    * email: deleted{userId}@ghost.local (재가입 가능하도록 중복 방지)
-    * name: "탈퇴한 사용자" (UI에 표시될 이름)
-    * provider: "DELETED" (탈퇴 상태 표시)
-    * isDeleted: true
-    * (else: null)
-    */
+     * email: deleted{userId}@ghost.local (재가입 가능하도록 중복 방지)
+     * name: "탈퇴한 사용자" (UI에 표시될 이름)
+     * provider: "DELETED" (탈퇴 상태 표시)
+     * isDeleted: true
+     * (else: null)
+     */
     private void convertToGhost(User user) {
         user.updateEmail("deleted" + user.getId() + "@ghost.local");
         user.updatePassword(null);
