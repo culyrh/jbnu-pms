@@ -9,6 +9,7 @@ import jbnu.jbnupms.domain.project.dto.ProjectInviteRequest;
 import jbnu.jbnupms.domain.project.dto.ProjectResponse;
 import jbnu.jbnupms.domain.project.dto.ProjectRoleUpdateRequest;
 import jbnu.jbnupms.domain.project.dto.ProjectUpdateRequest;
+import jbnu.jbnupms.domain.project.dto.RecentProjectResponse;
 import jbnu.jbnupms.domain.project.service.ProjectService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -52,6 +53,15 @@ public class ProjectController {
             @PathVariable Long projectId) {
         Long userId = Long.parseLong(userDetails.getUsername());
         return ResponseEntity.ok(CommonResponse.success(projectService.getProject(userId, projectId)));
+    }
+
+    @Operation(summary = "최근 프로젝트 조회 (대시보드)")
+    @GetMapping("/recent")
+    public ResponseEntity<CommonResponse<List<RecentProjectResponse>>> getRecentProjects(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam Long spaceId) {
+        Long userId = Long.parseLong(userDetails.getUsername());
+        return ResponseEntity.ok(CommonResponse.success(projectService.getRecentProjects(userId, spaceId)));
     }
 
     @Operation(summary = "프로젝트 수정")

@@ -7,9 +7,11 @@ import jbnu.jbnupms.domain.project.dto.ProjectInviteRequest;
 import jbnu.jbnupms.domain.project.dto.ProjectResponse;
 import jbnu.jbnupms.domain.project.dto.ProjectRoleUpdateRequest;
 import jbnu.jbnupms.domain.project.dto.ProjectUpdateRequest;
+import jbnu.jbnupms.domain.project.dto.RecentProjectResponse;
 import jbnu.jbnupms.domain.project.entity.Project;
 import jbnu.jbnupms.domain.project.entity.ProjectMember;
 import jbnu.jbnupms.domain.project.entity.ProjectRole;
+import jbnu.jbnupms.domain.project.entity.ProjectStatus;
 import jbnu.jbnupms.domain.project.repository.ProjectMemberRepository;
 import jbnu.jbnupms.domain.project.repository.ProjectRepository;
 import jbnu.jbnupms.domain.space.entity.Space;
@@ -18,6 +20,8 @@ import jbnu.jbnupms.domain.space.repository.SpaceRepository;
 import jbnu.jbnupms.domain.user.entity.User;
 import jbnu.jbnupms.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,6 +79,7 @@ public class ProjectService {
         }
 
         // 사용자가 속한 특정 스페이스의 프로젝트 목록 조회
+        @Transactional
         public List<ProjectResponse> getProjects(Long userId, Long spaceId) {
                 List<Project> projects = projectMemberRepository.findByUserIdAndSpaceId(userId, spaceId).stream()
                                 .map(ProjectMember::getProject)
@@ -89,12 +94,20 @@ public class ProjectService {
                                         List<ProjectMember> members = allMembers.stream()
                                                         .filter(pm -> pm.getProject().getId().equals(project.getId()))
                                                         .collect(Collectors.toList());
-                                        return ProjectResponse.from(project, members);
+
+                                        // 최근접근일시 업데이트 (내 프로젝트 멤버 객체 찾아서)
+                                        members.stream()
+                                                        .filter(pm -> pm.getUser().getId().equals(userId))
+                                                        .findFirst()
+                                                        .ifPresent(ProjectMember::updateLastAccessedAt);
+
+                                        return ProjectResponse.from(project, members, userId);
                                 })
                                 .collect(Collectors.toList());
         }
 
         // 프로젝트 단건 조회
+        @Transactional
         public ProjectResponse getProject(Long userId, Long projectId) {
                 Project project = projectRepository.findById(projectId)
                                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
@@ -109,7 +122,23 @@ public class ProjectService {
 
                 List<ProjectMember> members = projectMemberRepository.findByProjectId(projectId);
 
-                return ProjectResponse.from(project, members);
+                // 최근접근일시 업데이트
+                members.stream()
+                                .filter(pm -> pm.getUser().getId().equals(userId))
+                                .findFirst()
+                                .ifPresent(ProjectMember::updateLastAccessedAt);
+
+                return ProjectResponse.from(project, members, userId);
+        }
+
+        // 최근 프로젝트 조회 (대시보드용)
+        public List<RecentProjectResponse> getRecentProjects(Long userId, Long spaceId) {
+                Pageable pageable = PageRequest.of(0, 3);
+                return projectMemberRepository
+                                .findTop3RecentProjects(userId, spaceId, ProjectStatus.IN_PROGRESS, pageable)
+                                .stream()
+                                .map(RecentProjectResponse::from)
+                                .collect(Collectors.toList());
         }
 
         // 프로젝트 수정
@@ -121,7 +150,7 @@ public class ProjectService {
                 validateLeaderPermission(userId, projectId);
 
                 project.update(request.getName(), request.getDescription(), request.getDueDate(),
-                                request.getIsPublic());
+                                request.getIsPublic(), request.getStatus());
         }
 
         // 프로젝트 삭제

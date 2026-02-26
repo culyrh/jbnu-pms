@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import jbnu.jbnupms.domain.project.entity.ProjectMember;
 import jbnu.jbnupms.domain.project.entity.ProjectRole;
+import jbnu.jbnupms.domain.project.entity.ProjectStatus;
 
 @Getter
 @Builder
@@ -21,16 +22,25 @@ public class ProjectResponse {
     private Double progress;
     private LocalDateTime dueDate;
     private Boolean isPublic;
+    private ProjectStatus status;
+    private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime lastAccessedAt;
     private String managerName;
     private List<MemberDto> members;
 
-    public static ProjectResponse from(Project project, List<ProjectMember> projectMembers) {
+    public static ProjectResponse from(Project project, List<ProjectMember> projectMembers, Long currentUserId) {
         String managerName = projectMembers.stream()
                 .filter(pm -> pm.getRole() == ProjectRole.ADMIN)
                 .map(pm -> pm.getUser().getName())
                 .findFirst()
                 .orElse("Unknown");
+
+        LocalDateTime lastAccessedAt = projectMembers.stream()
+                .filter(pm -> pm.getUser().getId().equals(currentUserId))
+                .map(ProjectMember::getLastAccessedAt)
+                .findFirst()
+                .orElse(null);
 
         return ProjectResponse.builder()
                 .id(project.getId())
@@ -40,7 +50,10 @@ public class ProjectResponse {
                 .progress(project.getProgress())
                 .dueDate(project.getDueDate())
                 .isPublic(project.getIsPublic())
+                .status(project.getStatus())
+                .createdAt(project.getCreatedAt())
                 .updatedAt(project.getUpdatedAt())
+                .lastAccessedAt(lastAccessedAt)
                 .managerName(managerName)
                 .members(projectMembers.stream()
                         .map(MemberDto::new)
