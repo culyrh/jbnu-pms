@@ -17,6 +17,8 @@ import jbnu.jbnupms.domain.task.entity.TaskStatus;
 import jbnu.jbnupms.domain.space.repository.SpaceMemberRepository;
 import jbnu.jbnupms.domain.user.entity.User;
 import jbnu.jbnupms.domain.user.repository.UserRepository;
+import jbnu.jbnupms.domain.space.entity.ActionType;
+import jbnu.jbnupms.domain.space.service.ActivityLogService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +42,7 @@ public class TaskService {
     private final UserRepository userRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final SpaceMemberRepository spaceMemberRepository;
+    private final ActivityLogService activityLogService;
 
     // 태스크 생성
     @Transactional
@@ -122,6 +125,9 @@ public class TaskService {
         Task task = this.getTaskById(taskId);
         this.validateProjectMember(task.getProject().getId(), userId);
 
+        TaskStatus oldStatus = task.getStatus();
+        LocalDateTime oldDueDate = task.getDueDate();
+
         task.update(
                 request.getTitle() != null ? request.getTitle() : task.getTitle(),
                 request.getDescription() != null ? request.getDescription() : task.getDescription(),
@@ -129,6 +135,22 @@ public class TaskService {
                 request.getPriority() != null ? request.getPriority() : task.getPriority(),
                 request.getDueDate() != null ? request.getDueDate() : task.getDueDate(),
                 request.getProgress() != null ? request.getProgress() : task.getProgress());
+
+        if (request.getStatus() != null && oldStatus != TaskStatus.DONE && task.getStatus() == TaskStatus.DONE) {
+            activityLogService.logActivity(task.getProject().getSpace(), task.getProject().getId(),
+                    task.getProject().getName(), task.getId(), task.getTitle(), ActionType.TASK_COMPLETED,
+                    getUser(userId), "작업이 완료되었습니다.");
+        }
+
+        if (request.getDueDate() != null && oldDueDate != null && !request.getDueDate().equals(oldDueDate)) {
+            activityLogService.logActivity(task.getProject().getSpace(), task.getProject().getId(),
+                    task.getProject().getName(), task.getId(), task.getTitle(), ActionType.TASK_DUE_DATE_CHANGED,
+                    getUser(userId), "작업 마감일이 수정되었습니다.");
+        } else if (request.getDueDate() != null && oldDueDate == null) {
+            activityLogService.logActivity(task.getProject().getSpace(), task.getProject().getId(),
+                    task.getProject().getName(), task.getId(), task.getTitle(), ActionType.TASK_DUE_DATE_CHANGED,
+                    getUser(userId), "작업 마감일이 추가되었습니다.");
+        }
     }
 
     // 태스크 삭제
@@ -147,6 +169,10 @@ public class TaskService {
         this.validateProjectMember(task.getProject().getId(), userId);
 
         assignUserToTask(task, assigneeId);
+        User assignee = getUser(assigneeId);
+        activityLogService.logActivity(task.getProject().getSpace(), task.getProject().getId(),
+                task.getProject().getName(), task.getId(), task.getTitle(), ActionType.ASSIGNEE_CHANGED,
+                getUser(userId), assignee.getName() + "님이 담당자로 추가되었습니다.");
     }
 
     // 담당자 삭제
@@ -158,6 +184,9 @@ public class TaskService {
         User assignee = this.getUser(assigneeId);
 
         taskAssigneeRepository.deleteByTaskAndUser(task, assignee);
+        activityLogService.logActivity(task.getProject().getSpace(), task.getProject().getId(),
+                task.getProject().getName(), task.getId(), task.getTitle(), ActionType.ASSIGNEE_CHANGED,
+                getUser(userId), assignee.getName() + "님이 담당자에서 제외되었습니다.");
     }
 
     private void assignUserToTask(Task task, Long assigneeId) {
