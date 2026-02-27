@@ -51,6 +51,6 @@ jobs:
           echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
           kubectl apply -f k8s/
           kubectl set image deployment/jbnu-pms-app \
-            app=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ github.sha }} \
+            app=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
             -n jbnu-pms
           kubectl rollout status deployment/jbnu-pms-app -n jbnu-pms --timeout=300s
