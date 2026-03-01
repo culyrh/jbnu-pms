@@ -42,20 +42,15 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: 52.79.235.184
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd ~/jbnu-pms
-            
-            # 최신 이미지 pull (Public 이미지이므로 로그인 불필요)
-            docker compose pull app
-            
-            # 무중단 재시작
-            docker compose up -d app
-            
-            # 이전 이미지 정리
-            docker image prune -f
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Deploy to K8s
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
+          kubectl apply -f k8s/
+          kubectl set image deployment/jbnu-pms-app \
+            app=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            -n jbnu-pms
+          kubectl rollout status deployment/jbnu-pms-app -n jbnu-pms --timeout=600s

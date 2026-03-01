@@ -4,18 +4,19 @@ import jbnu.jbnupms.common.audit.UserAuditLogger;
 import jbnu.jbnupms.common.exception.CustomException;
 import jbnu.jbnupms.common.exception.ErrorCode;
 import jbnu.jbnupms.domain.user.dto.*;
-import jbnu.jbnupms.domain.user.entity.VerificationType;
-import jbnu.jbnupms.security.jwt.JwtTokenProvider;
 import jbnu.jbnupms.domain.user.entity.RefreshToken;
 import jbnu.jbnupms.domain.user.entity.User;
+import jbnu.jbnupms.domain.user.entity.VerificationType;
 import jbnu.jbnupms.domain.user.repository.RefreshTokenRepository;
 import jbnu.jbnupms.domain.user.repository.UserRepository;
+import jbnu.jbnupms.security.jwt.JwtTokenProvider;
 import jbnu.jbnupms.security.oauth.OAuth2UserInfoService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -33,6 +34,7 @@ public class AuthService {
     private final UserAuditLogger auditLogger;
     private final OAuth2UserInfoService oauth2UserInfoService;
     private final VerificationService verificationService;
+    private final TransactionTemplate transactionTemplate;
 
     @Transactional
     public Long register(RegisterRequest request) {
@@ -114,25 +116,25 @@ public class AuthService {
         String providerId = (String) userInfo.get("sub");
         String email = (String) userInfo.get("email");
         String name = (String) userInfo.get("name");
-        String profileImage = (String) userInfo.get("picture");
 
         if (providerId == null || email == null) {
             throw new CustomException(ErrorCode.INVALID_TOKEN,
                     "OAuth 토큰으로부터 필수 정보를 가져올 수 없습니다.");
         }
 
-        // 3. 트랜잭션 안에서 DB 작업만 수행
-        User user = saveOrUpdateOAuthUserInTransaction(
-                providerId,
-                email,
-                name,
-                profileImage,
-                request.getProvider().toUpperCase()
+        // 3. TransactionTemplate으로 DB 작업 범위만 정밀하게 트랜잭션 제어
+        User user = transactionTemplate.execute(status ->
+                saveOrUpdateOAuthUser(providerId, email, name,
+                        request.getProvider().toUpperCase())
         );
 
         // 4. JWT 토큰 생성
         String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail());
-        String refreshToken = handleRefreshToken(user.getId());
+
+        // 5. 리프레시 토큰 처리 (TransactionTemplate으로 독립 실행)
+        String refreshToken = transactionTemplate.execute(status ->
+                handleRefreshToken(user.getId())
+        );
 
         // 민감 정보 로깅 제거
         log.info("OAuth2 login successful: provider={}, userId={}", request.getProvider(), user.getId());
@@ -210,16 +212,15 @@ public class AuthService {
     }
 
     /**
-     * OAuth 사용자 저장/업데이트는 별도 트랜잭션으로 분리
+     * OAuth 사용자 저장/업데이트
+     * TransactionTemplate이 트랜잭션을 직접 보장하므로 AOP 프록시 불필요 -> private
      */
-    @Transactional
-    protected User saveOrUpdateOAuthUserInTransaction(String providerId, String email, String name,
-                                                      String profileImage, String provider) {
+    private User saveOrUpdateOAuthUser(String providerId, String email, String name,
+                                       String provider) {
         return userRepository.findByProviderAndProviderId(provider, providerId)
                 .map(existingUser -> {
-                    existingUser.updateName(name);
-                    if (profileImage != null) {
-                        existingUser.updateProfileImage(profileImage);
+                    if (name != null) {          // 이름 null 체크 추가
+                        existingUser.updateName(name);
                     }
                     log.info("OAuth2 user updated: email={}", email);
                     return userRepository.save(existingUser);
@@ -232,9 +233,6 @@ public class AuthService {
                                     existingUser.setProvider(currentProvider + "," + provider);
                                 }
                                 existingUser.setProviderId(providerId);
-                                if (profileImage != null) {
-                                    existingUser.updateProfileImage(profileImage);
-                                }
                                 User updated = userRepository.save(existingUser);
                                 log.info("Added {} to existing user: email={}", provider, email);
                                 return updated;
@@ -243,7 +241,6 @@ public class AuthService {
                                 User newUser = User.builder()
                                         .email(email)
                                         .name(name)
-                                        .profileImage(profileImage)
                                         .provider(provider)
                                         .providerId(providerId)
                                         .password(null)
@@ -266,11 +263,12 @@ public class AuthService {
 
     /**
      * Refresh Token 처리 (고정 만료 방식 - 7일)
-     * - 기존 토큰 유효하면 재사용
+     * - 기존 토큰이 유효하면 재사용
      * - 없거나 만료되었으면 새로 생성
+     * [V] 토큰이 만료된 경우와 토큰이 처음 생성되는 경우 모두를 포함하여 UPSERT 쿼리 하나로 처리
      */
-    // [V] 토큰이 만료된 경우와 토큰이 처음 생성되는 경우 모두를 포함하여 UPSERT 쿼리 하나로 처리
-    // -> UPSERT 적용을 위해 refresh token의 user_id 필드에 unique 조건이 추가됨
+    // UPSERT 적용을 위해 refresh token의 user_id 필드에 unique 조건이 추가됨
+    // TransactionTemplate이 트랜잭션을 직접 보장하므로 AOP 프록시 불필요 -> private 유지
     private String handleRefreshToken(Long userId) {
         return refreshTokenRepository
                 .findValidTokenByUserId(userId, LocalDateTime.now())
